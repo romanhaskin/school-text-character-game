@@ -15,12 +15,12 @@ from Infra.Display.characterWorker import CharacterShell
 
 @pytest.fixture
 def mock_console(mocker):
-    return mocker.patch("Infra.Display.characterWorker.console")
+    return mocker.MagicMock()
 
 
 @pytest.fixture
 def shell(mock_console):
-    return CharacterShell()
+    return CharacterShell(mock_console)
 
 
 @pytest.fixture

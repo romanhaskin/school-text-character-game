@@ -34,17 +34,22 @@ loading, undo and HTTP fetching. If no mode is given, `main.py` prompts for one.
 Domain events (`Core/events.py`) let `Core` report what happened without
 printing, so formatting stays in `Infra`.
 
-> `Infra/Display/*Worker.py` import `CLI.Presenter.Console`
-> directly, so Infra depends on CLI for output.
+Workers do not import `CLI.Presenter`. `main.py` creates the `Console`, passes
+it to `shell`, and the shell injects it into the active worker (see Key Contracts).
 
 ## Components
 
 ### Entry point — `main.py`
 - `parse_arguments(tokens)` splits argv into positional args and `-flag [value]` options.
 - `main()` resolves the mode (`game` / `text`, re-prompting on invalid input),
+  then builds `shell(worker_class, Console(), DataManager(), WebWorker(), mode)`
+  and runs it. It is the composition root: all collaborators are created here.
 
 ### CLI layer
 **`Commands.shell`** — the REPL.
+- Owns the injected `Console` and hands it to the active worker via `_adopt`
+  (on startup, after `load`, and after `undo`), so workers rebuilt through
+  `from_dict` still get it.
 - Reads a line, tokenises with `shlex`, resolves the command.
 - *Meta commands* (mode-independent): `help`, `save`, `load`, `fetch`, `undo`.
   Stop words: `exit`, `quit`, `stop`.
@@ -60,7 +65,7 @@ printing, so formatting stays in `Infra`.
 - Loading a save clears the history.
 
 **`Presenter.Console`** — thin I/O wrapper (`console_log`, `get_str`, `get_int`),
-making output replaceable in tests.
+making output replaceable in tests. Used by `shell` and, through it, by workers.
 
 ### Core layer
 **`character.py`**
@@ -92,7 +97,7 @@ making output replaceable in tests.
 **`Display/characterWorker.CharacterShell`** — game-mode state
 (`characters`, `items`, `abilities` keyed by id) and commands:
 `create`, `add`, `act`, `ls`. Subscribes to each character's events and prints
-them through `characterEvents.format_event`.
+them through `characterEvents.format_event` to `self.console`.
 
 **`Display/textWorker.DocumentShell`** — text-mode state (a `Document` plus a
 `current` container cursor) and filesystem-like commands:
@@ -109,7 +114,9 @@ them through `characterEvents.format_event`.
 **Worker contract** — any class passed to `shell` must provide:
 - `COMMANDS: dict[str, Callable[[list[str]], None]]`
 - `to_dict() -> dict` and `@classmethod from_dict(data) -> Self`
-- a no-argument constructor
+- a constructor callable without arguments, with an optional `console` parameter
+- a `console` attribute (`console_log`, `get_str`, `get_int`), assigned by the
+  shell via `_adopt`; workers use `self.console` for all input and output
 
 This single protocol powers save/load and undo for both modes, and is the
 extension point for adding a new mode.
@@ -141,5 +148,5 @@ user input ─► shell._read ─► shlex.split ─► _resolve(command)
 | Visitor   | `Core/text.py` (`ElementVisitor`)                 |
 | Builder   | `Core/text.py` (`TextDocumentBuilder`)            |
 | Facade    | `Infra/WebApi/WebWorker.py`                       |
-| Dependency injection | `main.py` → `shell`, `WebWorker`        |
+| Dependency injection | `main.py` → `shell`, `WebWorker`; `shell` → worker `console` |
 

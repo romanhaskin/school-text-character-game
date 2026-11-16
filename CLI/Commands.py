@@ -11,8 +11,8 @@ _STOP_WORDS = ("exit", "quit", "stop")
 
 class shell:
     def __init__(self, working_class, working_console, data_manager, webAPI, mode=None):
-        self.worker = working_class()
         self.console = working_console
+        self.worker = self._adopt(working_class())
         self.data = data_manager
         self.web = webAPI
         self.mode = mode
@@ -24,6 +24,10 @@ class shell:
             "undo": self._undo,
         }
         self.history = CommandHistory()
+
+    def _adopt(self, worker):
+        worker.console = self.console
+        return worker
 
     def _read(self):
         try:
@@ -51,7 +55,7 @@ class shell:
     def _load_local(self) -> None:
         save_name = self.console.get_str("enter save name: ")
         try:
-            self.worker = self.data.load_from_json(type(self.worker), save_name)
+            self.worker = self._adopt(self.data.load_from_json(type(self.worker), save_name))
             self.history.clear()
         except Exception as e:
             self.console.console_log(f"an error occured during loading, load failed: {e}")
@@ -75,7 +79,7 @@ class shell:
 
         try:
             data = SuperheroImporter.to_save_data(answer)
-            self.worker = self.worker.from_dict(data)
+            self.worker = self._adopt(self.worker.from_dict(data))
             self.history.clear()
         except ValueError as e:
             self.console.console_log(f"web load failed: {e}")
@@ -96,7 +100,7 @@ class shell:
             self.console.console_log("please enter valid argument")
 
     def _set_worker(self, worker) -> None:
-        self.worker = worker
+        self.worker = self._adopt(worker)
 
     def _undo(self, args: list[str]) -> None:
         command = self.history.pop()

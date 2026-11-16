@@ -15,12 +15,12 @@ from Infra.Display.textWorker import DocumentShell
 
 @pytest.fixture
 def mock_console(mocker):
-    return mocker.patch("Infra.Display.textWorker.console")
+    return mocker.MagicMock()
 
 
 @pytest.fixture
 def shell(mock_console):
-    return DocumentShell()
+    return DocumentShell(mock_console)
 
 
 @pytest.fixture

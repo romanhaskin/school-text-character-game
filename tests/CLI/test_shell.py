@@ -208,10 +208,9 @@ def test_loading_clears_history(console, data):
     assert logged(console) == ["loaded slot", "nothing to undo"]
 
 
-def test_undo_restores_real_character_shell(console, mocker):
+def test_undo_restores_real_character_shell(console):
     from Core.character import Character
     from Infra.Display.characterWorker import CharacterShell
-    mocker.patch("Infra.Display.characterWorker.console")
     cli = shell(CharacterShell, console, None, None, "game")
     cli.worker._register(cli.worker.characters, Character("tom", 10, 0, 1))
     console.get_str.side_effect = ["act attack tom tom", "undo", "exit"]
@@ -219,4 +218,5 @@ def test_undo_restores_real_character_shell(console, mocker):
     cli.run()
 
     assert cli.worker.characters[1].health == 10
-    assert logged(console) == ["undone: act attack tom tom"]
+    assert logged(console)[-1] == "undone: act attack tom tom"
+    assert any("takes" in m for m in logged(console))
