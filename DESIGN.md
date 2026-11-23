@@ -46,15 +46,18 @@ it to `shell`, and the shell injects it into the active worker (see Key Contract
   (on startup, after `load`, and after `undo`), so workers rebuilt through
   `from_dict` still get it.
 - Reads a line, tokenises with `shlex`, resolves the command.
-- *Meta commands* (mode-independent): `help`, `save`, `load`, `fetch`, `undo`.
+- *Meta commands* (mode-independent): `help`, `save`, `load`, `fetch`, `undo`, `history`.
   Stop words: `exit`, `quit`, `stop`.
 - *Worker commands* come from `worker.COMMANDS` (a name → bound-method dict).- `load` in game mode can import from the web (SuperHero API) or a local file
 
-**`History`** — undo support.
+**`History`** — undo support and step history.
 - `Command` (ABC) → `WorkerCommand`: wraps a worker handler call.
 - `Memento`: snapshot of a worker via `to_dict()`, restored via `from_dict()`.
 - `WorkerCommand.execute()` snapshots before/after; the command is pushed onto
   `CommandHistory` only if state actually changed (`changed_state`).
+- `CommandHistory.labels()` returns the command lines of the recorded steps;
+  the `history` meta command prints them numbered, oldest first. Only
+  state-changing steps appear, and undone steps are removed.
 - Loading a save clears the history.
 
 **`Presenter.Console`** — thin I/O wrapper (`console_log`, `get_str`, `get_int`),

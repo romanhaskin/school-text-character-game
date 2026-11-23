@@ -63,6 +63,9 @@ class CommandHistory:
     def pop(self) -> Optional[Command]:
         return self._stack.pop() if self._stack else None
 
+    def labels(self) -> List[str]:
+        return [command.label for command in self._stack]
+
     def clear(self) -> None:
         self._stack.clear()
 

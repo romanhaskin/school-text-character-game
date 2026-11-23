@@ -22,6 +22,7 @@ class shell:
             "load": self._load,
             "fetch": self._fetch,
             "undo": self._undo,
+            "history": self._history,
         }
         self.history = CommandHistory()
 
@@ -109,6 +110,14 @@ class shell:
             return
         command.undo()
         self.console.console_log(f"undone: {command.label}")
+
+    def _history(self, args: list[str]) -> None:
+        labels = self.history.labels()
+        if not labels:
+            self.console.console_log("history is empty")
+            return
+        for number, label in enumerate(labels, 1):
+            self.console.console_log(f"{number}. {label}")
 
     def _execute_worker_command(self, line: str, handler, args: list[str]) -> None:
         command = WorkerCommand(line, handler, args, lambda: self.worker, self._set_worker)
