@@ -220,3 +220,18 @@ def test_undo_restores_real_character_shell(console):
     assert cli.worker.characters[1].health == 10
     assert logged(console)[-1] == "undone: act attack tom tom"
     assert any("takes" in m for m in logged(console))
+
+
+def test_history_lists_state_changing_steps_in_order(console):
+    run(console, "echo a", "noop", "echo b", "history")
+    assert logged(console) == ["1. echo a", "2. echo b"]
+
+
+def test_history_drops_undone_steps(console):
+    run(console, "echo a", "echo b", "undo", "history")
+    assert logged(console) == ["undone: echo b", "1. echo a"]
+
+
+def test_history_empty(console):
+    run(console, "history")
+    assert logged(console) == ["history is empty"]

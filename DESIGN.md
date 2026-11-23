@@ -2,17 +2,12 @@
 
 ## Overview
 
-A Python command-line application with two operating modes, selected at launch:
+A Python command-line application with a single operating mode, `game`
+(`python main.py game`): create characters, items and abilities; fight, heal,
+equip. If no mode is given, `main.py` prompts for one.
 
-| Mode   | Command             | Purpose                                                        |
-|--------|---------------------|----------------------------------------------------------------|
-| `game` | `python main.py game` | Create characters, items and abilities; fight, heal, equip.  |
-| `text` | `python main.py text` | Build and navigate a structured text document as a tree.     |
-
-Both modes run inside the same interactive shell that provides saving,
-loading, undo and HTTP fetching. If no mode is given, `main.py` prompts for one.
-
-- in future, "text" will be removed from main version.
+The mode runs inside an interactive shell that provides saving, loading, undo,
+step history and HTTP fetching.
 
 ## Architectural Layers
 
@@ -41,7 +36,7 @@ it to `shell`, and the shell injects it into the active worker (see Key Contract
 
 ### Entry point — `main.py`
 - `parse_arguments(tokens)` splits argv into positional args and `-flag [value]` options.
-- `main()` resolves the mode (`game` / `text`, re-prompting on invalid input),
+- `main()` resolves the mode (`game`, re-prompting on invalid input),
   then builds `shell(worker_class, Console(), DataManager(), WebWorker(), mode)`
   and runs it. It is the composition root: all collaborators are created here.
 
@@ -53,9 +48,7 @@ it to `shell`, and the shell injects it into the active worker (see Key Contract
 - Reads a line, tokenises with `shlex`, resolves the command.
 - *Meta commands* (mode-independent): `help`, `save`, `load`, `fetch`, `undo`.
   Stop words: `exit`, `quit`, `stop`.
-- *Worker commands* come from `worker.COMMANDS` (a name → bound-method dict).
-- `load` in game mode can import from the web (SuperHero API) or a local file;
-  in text mode it loads locally only.
+- *Worker commands* come from `worker.COMMANDS` (a name → bound-method dict).- `load` in game mode can import from the web (SuperHero API) or a local file
 
 **`History`** — undo support.
 - `Command` (ABC) → `WorkerCommand`: wraps a worker handler call.
@@ -82,14 +75,6 @@ making output replaceable in tests. Used by `shell` and, through it, by workers.
   (**Observer**: `subscribe` / `unsubscribe` / `emit`).
 - `Character` emits events (damage, kill, heal, equip, …) instead of printing.
 
-**`text.py`**
-- **Composite**: `TextElement` → `LeafElement` (`PlainText`, `Link`, `Image`,
-  `Paragraph`) and `ContainerElement` (`Header`, `Document`). Each element has
-  an auto-incremented id (counter advanced on load to avoid collisions).
-- **Visitor**: `ElementVisitor` with `TocVisitor` (table of contents) and
-  `TreeLinesVisitor` (tree printout).
-- **Builder**: `TextDocumentBuilder` / `ParagraphBuilder` for fluent construction.
-
 ### Infra layer
 **`Data.DataManager`** — saves/loads any `Serializable` (protocol with
 `to_dict` / `from_dict`) as JSON in `saves/`.
@@ -98,10 +83,6 @@ making output replaceable in tests. Used by `shell` and, through it, by workers.
 (`characters`, `items`, `abilities` keyed by id) and commands:
 `create`, `add`, `act`, `ls`. Subscribes to each character's events and prints
 them through `characterEvents.format_event` to `self.console`.
-
-**`Display/textWorker.DocumentShell`** — text-mode state (a `Document` plus a
-`current` container cursor) and filesystem-like commands:
-`pwd`, `print`, `add`, `rm`, `up`, `cd`.
 
 **`WebApi/`** — layered HTTP access:
 `WebWorker.fetch_json(url)` → `WebCaller.get` (network, `WebCallerError`) →
@@ -118,7 +99,7 @@ them through `characterEvents.format_event` to `self.console`.
 - a `console` attribute (`console_log`, `get_str`, `get_int`), assigned by the
   shell via `_adopt`; workers use `self.console` for all input and output
 
-This single protocol powers save/load and undo for both modes, and is the
+This single protocol powers save/load and undo, and is the
 extension point for adding a new mode.
 
 ## Data Flow
@@ -144,9 +125,5 @@ user input ─► shell._read ─► shlex.split ─► _resolve(command)
 | Memento   | `CLI/History.py` (`Memento`)                      |
 | Observer  | `Core/events.py` (`EventEmitter`)                 |
 | Strategy  | `Core/character.py` (`AbilityEffect` subclasses)  |
-| Composite | `Core/text.py` (element tree)                     |
-| Visitor   | `Core/text.py` (`ElementVisitor`)                 |
-| Builder   | `Core/text.py` (`TextDocumentBuilder`)            |
 | Facade    | `Infra/WebApi/WebWorker.py`                       |
 | Dependency injection | `main.py` → `shell`, `WebWorker`; `shell` → worker `console` |
-

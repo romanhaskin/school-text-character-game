@@ -2,7 +2,6 @@ import sys
 
 import CLI.Commands as Commands
 
-import Infra.Display.textWorker as textWorker
 import Infra.Display.characterWorker as characterWorker
 
 from CLI.Presenter import Console
@@ -41,11 +40,8 @@ def main():
         if mode == "game":  
             worker = characterWorker.CharacterShell
             break
-        elif mode == "text":
-            worker = textWorker.DocumentShell 
-            break
         else:
-            mode = input("please choose an operating mode: <game/text>")
+            mode = input("please choose an operating mode: <game>")
 
     s = Commands.shell(worker, Console(), DataManager(), WebWorker(), mode)
     s.run()
