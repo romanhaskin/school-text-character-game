@@ -51,6 +51,10 @@ class shell:
         return self._read()
 
     def _help(self, args: list[str]) -> None:
+        self.console.console_log("---META COMMANDS---")
+        for name in self.meta_commands:
+            self.console.console_log(name)
+        self.console.console_log("---WORKER COMMANDS---")
         for name in self.worker.COMMANDS:
             self.console.console_log(name)
 
