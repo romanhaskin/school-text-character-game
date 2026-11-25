@@ -79,8 +79,12 @@ making output replaceable in tests. Used by `shell` and, through it, by workers.
 - `Character` emits events (damage, kill, heal, equip, …) instead of printing.
 
 ### Infra layer
-**`Data.DataManager`** — saves/loads any `Serializable` (protocol with
-`to_dict` / `from_dict`) as JSON in `saves/`.
+**`Data.DataManager`** — saves/loads JSON under
+`.local/share/text-character-game/` (`characters/` for
+individual characters). Names are validated and `.json` is appended, writes are atomic.
+Save file = `{"shell": {"history": [labels]}, "worker": {...}}`. Loaded history is not undoable. 
+`savechar <id/name> [file]` / `loadchar <file>` export or
+import one character (with items and abilities) (fresh ids; `loadchar` is undoable).
 
 **`Display/characterWorker.CharacterShell`** — game-mode state
 (`characters`, `items`, `abilities` keyed by id) and commands:

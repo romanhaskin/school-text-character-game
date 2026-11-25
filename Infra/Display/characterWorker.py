@@ -86,6 +86,32 @@ class CharacterShell:
         return shell
 
 
+    def export_character(self, character: Character) -> dict:
+        return {
+            "characters": [character.to_dict()],
+            "items": [i.to_dict() for i in character.inventory],
+            "abilities": [a.to_dict() for a in character.abilities],
+        }
+
+    def import_character(self, data: dict) -> Character:
+        items: Dict[object, Item] = {}
+        abilities: Dict[object, Ability] = {}
+        for d in data["items"]:
+            items[d["id"]] = Item.from_dict(d)
+        for d in data["abilities"]:
+            abilities[d["id"]] = Ability.from_dict(d)
+
+        character = Character.from_dict(data["characters"][0])
+        character.inventory = [items[i.id] for i in character.inventory]
+        character.abilities = [abilities[a.id] for a in character.abilities]
+
+        for item in items.values():
+            self._register(self.items, item)
+        for ability in abilities.values():
+            self._register(self.abilities, ability)
+        self._register(self.characters, character)
+        return character
+
     def _dialog_create_char(self) -> Optional[Character]:
         name = self.console.get_str("Name: ")
         if not name:

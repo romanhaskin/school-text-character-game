@@ -9,6 +9,14 @@ _FETCH_FAILED = object()
 _STOP_WORDS = ("exit", "quit", "stop")
 
 
+class _Snapshot:
+    def __init__(self, data: dict):
+        self._data = data
+
+    def to_dict(self) -> dict:
+        return self._data
+
+
 class shell:
     def __init__(self, working_class, working_console, data_manager, webAPI, mode=None):
         self.console = working_console
@@ -23,6 +31,8 @@ class shell:
             "fetch": self._fetch,
             "undo": self._undo,
             "history": self._history,
+            "savechar": self._save_char,
+            "loadchar": self._load_char,
         }
         self.history = CommandHistory()
 
@@ -44,10 +54,23 @@ class shell:
         for name in self.worker.COMMANDS:
             self.console.console_log(name)
 
+    def to_dict(self) -> dict:
+        return {
+            "shell": {"history": self.history.labels()},
+            "worker": self.worker.to_dict(),
+        }
+
+    def load_dict(self, data: dict) -> None:
+        shell_data = data.get("shell") if isinstance(data.get("shell"), dict) else {}
+        worker_data = data["worker"] if "worker" in data else data
+        self.worker = self._adopt(type(self.worker).from_dict(worker_data))
+        history = shell_data.get("history", [])
+        self.history.load_labels(history if isinstance(history, list) else [])
+
     def _save(self, args: list[str]) -> None:
         save_name = self.console.get_str("enter save name: ")
         try:
-            self.data.save_to_json(self.worker, save_name)
+            self.data.save_to_json(self, save_name)
         except Exception as e:
             self.console.console_log(f"an error occured during saving, save failed: {e}")
             return
@@ -56,8 +79,7 @@ class shell:
     def _load_local(self) -> None:
         save_name = self.console.get_str("enter save name: ")
         try:
-            self.worker = self._adopt(self.data.load_from_json(type(self.worker), save_name))
-            self.history.clear()
+            self.load_dict(self.data.read_json(save_name))
         except Exception as e:
             self.console.console_log(f"an error occured during loading, load failed: {e}")
             return
@@ -86,6 +108,38 @@ class shell:
             self.console.console_log(f"web load failed: {e}")
             return
         self.console.console_log(f"loaded {answer['name']} from web")
+
+    def _save_char(self, args: list[str]) -> None:
+        if not args or not hasattr(self.worker, "export_character"):
+            self.console.console_log("Usage: savechar <id/name> [file name]")
+            return
+        character = self.worker._find(self.worker.characters, args[0])
+        if character is None:
+            self.console.console_log(f"No character found for '{args[0]}'.")
+            return
+        file_name = args[1] if len(args) > 1 else character.name
+        try:
+            self.data.save_to_json(_Snapshot(self.worker.export_character(character)),
+                                   file_name, self.data.CHARACTERS_DIR)
+        except Exception as e:
+            self.console.console_log(f"an error occured during saving, save failed: {e}")
+            return
+        self.console.console_log(f"saved character '{character.name}' as {file_name}")
+
+    def _import_char(self, args: list[str]) -> None:
+        try:
+            data = self.data.read_json(args[0], self.data.CHARACTERS_DIR)
+            character = self.worker.import_character(data)
+        except Exception as e:
+            self.console.console_log(f"an error occured during loading, load failed: {e}")
+            return
+        self.console.console_log(f"loaded character '{character.name}' (id={character.id})")
+
+    def _load_char(self, args: list[str]) -> None:
+        if not args or not hasattr(self.worker, "import_character"):
+            self.console.console_log("Usage: loadchar <file name>")
+            return
+        self._execute_worker_command("loadchar " + " ".join(args), self._import_char, args)
 
     def _load(self, args: list[str]) -> None:
         if self.mode != "game":

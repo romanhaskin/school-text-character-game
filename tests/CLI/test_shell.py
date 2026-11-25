@@ -73,15 +73,15 @@ def test_save_and_load(console, data):
     cli = shell(FakeWorker, console, data, web)
     cli.worker = worker
     cli.run()
-    data.save_to_json.assert_called_once_with(worker, "slot")
-    data.load_from_json.assert_called_once_with(FakeWorker, "slot")
-    assert cli.worker is data.load_from_json.return_value
+    data.save_to_json.assert_called_once_with(cli, "slot")
+    data.read_json.assert_called_once_with("slot")
+    assert isinstance(cli.worker, FakeWorker) and cli.worker is not worker
     assert logged(console) == ["saved slot", "loaded slot"]
 
 
 def test_save_load_failures_are_reported(console, data):
     data.save_to_json.side_effect = OSError("disk")
-    data.load_from_json.side_effect = OSError("missing")
+    data.read_json.side_effect = OSError("missing")
     cli = run(console, "save", "slot", "load", "slot", data=data)
     assert isinstance(cli.worker, FakeWorker)
     assert [m for m in logged(console) if "failed" in m] == [
@@ -112,7 +112,7 @@ def test_fetch_caller_error_is_reported(console, web):
 def test_load_from_web_ignored_outside_game_mode(console, web, data):
     run(console, "load", "slot", data=data, web=web, mode="text")
     web.fetch_json.assert_not_called()
-    data.load_from_json.assert_called_once_with(FakeWorker, "slot")
+    data.read_json.assert_called_once_with("slot")
     assert logged(console) == ["loaded slot"]
 
 
@@ -202,10 +202,23 @@ def test_undo_itself_is_not_recorded(console):
     assert logged(console) == ["undone: echo a", "nothing to undo"]
 
 
-def test_loading_clears_history(console, data):
-    data.load_from_json.return_value = FakeWorker()
-    cli = run(console, "echo a", "load", "slot", "undo", data=data)
-    assert logged(console) == ["loaded slot", "nothing to undo"]
+def test_loading_keeps_saved_history_read_only(console, data):
+    data.read_json.return_value = {"shell": {"history": ["echo x", "echo y"], "future_key": 1},
+                                   "worker": {"calls": []}}
+    cli = run(console, "echo a", "load", "slot", "history", "undo", data=data)
+    assert logged(console) == ["loaded slot", "1. echo x", "2. echo y", "nothing to undo"]
+
+
+def test_load_legacy_bare_worker_save(console, data):
+    data.read_json.return_value = {"calls": [["a"]]}
+    cli = run(console, "load", "slot", "history", data=data)
+    assert cli.worker.calls == [["a"]]
+    assert logged(console) == ["loaded slot", "history is empty"]
+
+
+def test_shell_to_dict_contains_history_and_worker(console):
+    cli = run(console, "echo a")
+    assert cli.to_dict() == {"shell": {"history": ["echo a"]}, "worker": {"calls": [["a"]]}}
 
 
 def test_undo_restores_real_character_shell(console):
@@ -235,3 +248,26 @@ def test_history_drops_undone_steps(console):
 def test_history_empty(console):
     run(console, "history")
     assert logged(console) == ["history is empty"]
+
+
+def test_savechar_and_loadchar_round_trip(console, tmp_path):
+    from Core.character import Character, Item
+    from Infra.Data import DataManager
+    from Infra.Display.characterWorker import CharacterShell
+    dm = DataManager(tmp_path)
+
+    first = shell(CharacterShell, console, dm, None, "game")
+    hero = Character("hero", 10, 0, 1)
+    first.worker._register(first.worker.characters, hero)
+    sword = Item("sword", attack_bonus=2)
+    first.worker._register(first.worker.items, sword)
+    hero.inventory.append(sword)
+    console.get_str.side_effect = ["savechar hero", "exit"]
+    first.run()
+    assert (tmp_path / "characters" / "hero.json").exists()
+
+    second = shell(CharacterShell, console, dm, None, "game")
+    console.get_str.side_effect = ["loadchar hero", "history", "undo", "exit"]
+    second.run()
+    assert second.worker.characters == {}
+    assert "1. loadchar hero" in logged(console)

@@ -187,3 +187,30 @@ def test_serialization_roundtrip(populated):
     assert r_tom.inventory[0] is restored.items[stick.id]
     assert r_tom.abilities[0] is restored.abilities[smack.id]
     assert next(restored._ids) == 5
+
+
+def test_export_import_character_assigns_fresh_ids():
+    from Core.character import Ability, Character, Item
+    from Infra.Display.characterWorker import CharacterShell
+    src = CharacterShell(console=None)
+    hero = Character("hero", 10, 1, 2)
+    src._register(src.characters, hero)
+    sword = Item("sword", attack_bonus=3)
+    src._register(src.items, sword)
+    zap = Ability("zap", "attack", 5)
+    src._register(src.abilities, zap)
+    hero.inventory.append(sword)
+    hero.abilities.append(zap)
+
+    dst = CharacterShell(console=None)
+    other = Character("other", 5, 0, 1)
+    dst._register(dst.characters, other)
+    dst._register(dst.items, Item("junk"))
+
+    loaded = dst.import_character(src.export_character(hero))
+    assert loaded.id not in (other.id, 2) and dst.characters[loaded.id] is loaded
+    assert [i.name for i in loaded.inventory] == ["sword"]
+    assert loaded.inventory[0] is dst.items[loaded.inventory[0].id]
+    assert loaded.abilities[0] is dst.abilities[loaded.abilities[0].id]
+    assert len({*dst.characters, *dst.items, *dst.abilities}) == 5
+    assert loaded.attack_power == 5

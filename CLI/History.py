@@ -56,6 +56,11 @@ class CommandHistory:
 
     def __init__(self):
         self._stack: List[Command] = []
+        self._past: List[str] = []
+
+    def load_labels(self, labels: List[str]) -> None:
+        self._stack.clear()
+        self._past = [str(label) for label in labels]
 
     def push(self, command: Command) -> None:
         self._stack.append(command)
@@ -64,10 +69,11 @@ class CommandHistory:
         return self._stack.pop() if self._stack else None
 
     def labels(self) -> List[str]:
-        return [command.label for command in self._stack]
+        return self._past + [command.label for command in self._stack]
 
     def clear(self) -> None:
         self._stack.clear()
+        self._past.clear()
 
     def __len__(self) -> int:
         return len(self._stack)
